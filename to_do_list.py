@@ -1,23 +1,24 @@
-import uuid
-import random
-from datetime import datetime
-from flask import Flask, jsonify, request
-from flasgger import Swagger
-import streamlit as st
+import uuid #generate unique ids for the task
+import random #random encounter messages 
+from datetime import datetime  #timestamps 
+from flask import Flask, jsonify, request   #web framework
+from flasgger import Swagger   #api documents 
+import streamlit as st    #gui
+
+#i think these should be all i need for what i am planning for the code 
 
 # Initialize Flask app
 app = Flask(__name__)
 app.config['SWAGGER'] = {
-    'title': 'Friendly To-Do API',
+    'title': 'To-Do API',  #the frienndly made it sound corny 
     'description': 'A warm and human-centered task manager ✨',
     'version': '1.0',
-    'termsOfService': 'https://example.com/tos',
     'contact': {'name': 'Task Support', 'email': 'help@friendlytasks.com'},
 }
 Swagger(app)
 
 # In-memory database
-todos = []
+todos = []  #list to store tasks 
 
 # Helper functions
 def human_response(message, status='success', **kwargs):
@@ -34,10 +35,10 @@ def human_task(task):
         'status_text': "Completed! Great job!" if task['completed'] else "In progress - you've got this!"
     }
 
+#make it more friendly and cheary and motivational
 def random_encouragement():
     """Return random motivational message"""
     encouragements = [
-        "Progress, not perfection!",
         "You're doing amazing!",
         "One task at a time - you've got this!",
         "Every small step counts!",
