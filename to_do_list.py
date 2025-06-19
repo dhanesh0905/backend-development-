@@ -45,3 +45,65 @@ def random_encouragement():
         "Be proud of what you've accomplished today!"
     ]
     return random.choice(encouragements)
+
+# retrive all tasks human task to make it more friendly random encounter for chearing
+@app.route('/tasks', methods=['GET'])
+def get_tasks():
+    """
+    Get all tasks
+    ---
+    responses:
+      200:
+        description: List of humanized tasks
+        examples:
+          tasks: [{id: '...', title: 'Buy milk', completed: false}]
+    """
+    return jsonify({
+        'tasks': [human_task(t) for t in todos],
+        'count': len(todos),
+        'encouragement': random_encouragement()
+    })
+
+
+#make new tasks 
+@app.route('/tasks', methods=['POST'])
+def create_task():
+    """
+    Create a new task
+    ---
+    parameters:
+      - name: body
+        in: body
+        required: true
+        schema:
+          type: object
+          properties:
+            title:
+              type: string
+              example: Water the plants
+            priority:
+              type: string
+              enum: [high, medium, low]
+              default: medium
+    responses:
+      201:
+        description: Task created
+        examples:
+          message: Task created! 🌱
+    """
+    data = request.json
+    if not data or 'title' not in data or not data['title'].strip():
+        return jsonify(human_response('Task title is required!', 'error')), 400
+        
+    new_task = {
+        'id': str(uuid.uuid4()),
+        'title': data['title'].strip(),
+        'description': data.get('description', '').strip(),
+        'created': datetime.now().isoformat(),
+        'completed': False,
+        'priority': data.get('priority', 'medium')
+    }
+    todos.append(new_task)
+    return jsonify(human_response("Task created! 🌱", task=human_task(new_task))), 201
+
+
