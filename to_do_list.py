@@ -105,5 +105,29 @@ def create_task():
     }
     todos.append(new_task)
     return jsonify(human_response("Task created! 🌱", task=human_task(new_task))), 201
-
-
+#mark complete tasks \ mark tasks as complete 
+@app.route('/tasks/<task_id>/complete', methods=['PUT'])
+def complete_task(task_id):
+    """
+    Mark task as completed
+    ---
+    parameters:
+      - name: task_id
+        in: path
+        type: string
+        required: true
+    responses:
+      200:
+        description: Task marked complete
+        examples:
+          message: Great job completing this task! 🎉
+      404:
+        description: Task not found
+    """
+    task = next((t for t in todos if t['id'] == task_id), None)
+    if not task:
+        return jsonify(human_response("Task not found", "error")), 404
+        
+    task['completed'] = True
+    task['completed_at'] = datetime.now().isoformat()
+    return jsonify(human_response("congrats !! u completed a task ! 🎉", task=human_task(task)))
