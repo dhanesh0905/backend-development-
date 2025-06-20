@@ -160,3 +160,11 @@ def delete_task(task_id):
         return jsonify(human_response("Task not found", "error")), 404
         
     return jsonify(human_response("Task removed! Making space for new accomplishments 🌈"))
+
+#streamlit 
+def run_streamlit():
+    st.set_page_config(page_title="Friendly To-Do List", page_icon="✅", layout="centered")
+    
+    st.title("✨ Friendly Task Manager")
+    st.caption("Your warm and encouraging productivity companion")
+    
