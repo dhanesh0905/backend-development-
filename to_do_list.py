@@ -183,4 +183,20 @@ def run_streamlit():
                 st.success("Task added successfully!")
             else:
                 st.error("Failed to add task")
-   
+    # Task list
+    st.subheader("Your Tasks")
+    if not todos:
+        st.info("No tasks yet! Add your first task above.", icon="ℹ️")
+    
+    for task in todos:
+        task_id = task['id']
+        cols = st.columns([0.1, 0.6, 0.2, 0.1])
+        
+        with cols[0]:
+            # Checkbox for completion
+            if st.checkbox("", key=f"complete_{task_id}", value=task['completed']):
+                if not task['completed']:
+                    response = app.test_client().put(f'/tasks/{task_id}/complete')
+                    if response.status_code == 200:
+                        st.experimental_rerun()
+        
