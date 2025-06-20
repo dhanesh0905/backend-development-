@@ -225,3 +225,8 @@ def run_streamlit():
     st.subheader("💌 Encouragement Corner")
     if st.button("I need motivation!"):
         st.success(random_encouragement())
+        
+ # API documentation link
+    st.markdown("---")
+    st.markdown("### API Documentation")
+    st.markdown("Our backend API follows OpenAPI standards: [http://localhost:5000/apidocs](http://localhost:5000/apidocs)")
