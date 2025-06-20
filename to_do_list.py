@@ -5,8 +5,6 @@ from flask import Flask, jsonify, request   #web framework
 from flasgger import Swagger   #api documents 
 import streamlit as st    #gui
 
-#i think these should be all i need for what i am planning for the code 
-
 # Initialize Flask app
 app = Flask(__name__)
 app.config['SWAGGER'] = {
@@ -230,3 +228,19 @@ def run_streamlit():
     st.markdown("---")
     st.markdown("### API Documentation")
     st.markdown("Our backend API follows OpenAPI standards: [http://localhost:5000/apidocs](http://localhost:5000/apidocs)")
+# Run both apps
+if __name__ == '__main__':
+    import threading
+    import webbrowser
+    
+    # Start Flask in background thread
+    threading.Thread(target=app.run, daemon=True).start()
+    
+    # Open browser to Streamlit frontend
+    webbrowser.open("http://localhost:8501")
+    
+    # Start Streamlit frontend
+    import streamlit.cli as stcli
+    import sys
+    sys.argv = ["streamlit", "run", __file__, "--server.port=8501", "--server.headless=true"]
+    sys.exit(stcli.main())
