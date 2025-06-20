@@ -1,221 +1,173 @@
+import tkinter as tk
+from tkinter import ttk, messagebox
+import json
 import uuid
 import random
-import json
 import os
 from datetime import datetime
-from flask import Flask, jsonify, request
-from flasgger import Swagger
-import streamlit as st
-import threading
-import webbrowser
-
-# Initialize Flask app
-app = Flask(__name__)
-app.config['SWAGGER'] = {
-    'title': 'To-Do API',
-    'description': 'A warm and human-centered task manager ✨',
-    'version': '1.0',
-    'contact': {'name': 'Task Support', 'email': 'help@friendlytasks.com'},
-}
-Swagger(app)
 
 # JSON database file
 DB_FILE = "todo_db.json"
 
-# Helper functions
-def human_response(message, status='success', **kwargs):
-    return {'status': status, 'message': message, **kwargs}
-
-def human_task(task):
-    emoji = '✅' if task['completed'] else '⏳'
-    priority_icons = {'high': '❗️', 'medium': '🔸', 'low': '🔹'}
-    return {
-        **task,
-        'display': f"{emoji} {priority_icons.get(task['priority'], '📝')} {task['title']}",
-        'status_text': "Completed! Great job!" if task['completed'] else "In progress - you've got this!"
-    }
-
-def random_encouragement():
-    encouragements = [
-        "You're doing amazing!",
-        "One task at a time - you've got this!",
-        "Every small step counts!",
-        "Be proud of what you've accomplished today!"
-    ]
-    return random.choice(encouragements)
-
-# Database functions
-def load_tasks():
-    """Load tasks from JSON file"""
-    if not os.path.exists(DB_FILE):
-        return []
-    try:
-        with open(DB_FILE, 'r') as f:
-            return json.load(f)
-    except:
-        return []
-
-def save_tasks(tasks):
-    """Save tasks to JSON file"""
-    with open(DB_FILE, 'w') as f:
-        json.dump(tasks, f, indent=2)
-
-# Flask API endpoints
-@app.route('/tasks', methods=['GET'])
-def get_tasks():
-    tasks = load_tasks()
-    return jsonify({
-        'tasks': [human_task(t) for t in tasks],
-        'count': len(tasks),
-        'encouragement': random_encouragement()
-    })
-
-@app.route('/tasks', methods=['POST'])
-def create_task():
-    data = request.json
-    if not data or 'title' not in data or not data['title'].strip():
-        return jsonify(human_response('Task title is required!', 'error')), 400
+class TodoApp:
+    def __init__(self, root):
+        self.root = root
+        self.root.title("you can do it !!")
+        self.root.geometry("800x500")
         
-    tasks = load_tasks()
-    new_task = {
-        'id': str(uuid.uuid4()),
-        'title': data['title'].strip(),
-        'description': data.get('description', '').strip(),
-        'created': datetime.now().isoformat(),
-        'completed': False,
-        'priority': data.get('priority', 'medium')
-    }
-    tasks.append(new_task)
-    save_tasks(tasks)
-    return jsonify(human_response("Task created! 🌱", task=human_task(new_task))), 201
-
-@app.route('/tasks/<task_id>/complete', methods=['PUT'])
-def complete_task(task_id):
-    tasks = load_tasks()
-    task = next((t for t in tasks if t['id'] == task_id), None)
-    if not task:
-        return jsonify(human_response("Task not found", "error")), 404
+        # Create database file if needed
+        if not os.path.exists(DB_FILE):
+            with open(DB_FILE, 'w') as f:
+                json.dump([], f)
         
-    task['completed'] = True
-    task['completed_at'] = datetime.now().isoformat()
-    save_tasks(tasks)
-    return jsonify(human_response("Congrats!! You completed a task! 🎉", task=human_task(task)))
-
-@app.route('/tasks/<task_id>', methods=['DELETE'])
-def delete_task(task_id):
-    tasks = load_tasks()
-    initial_count = len(tasks)
-    tasks = [t for t in tasks if t['id'] != task_id]
-    
-    if len(tasks) == initial_count:
-        return jsonify(human_response("Task not found", "error")), 404
+        self.create_widgets()
+        self.refresh_tasks()
         
-    save_tasks(tasks)
-    return jsonify(human_response("Task removed! Making space for new accomplishments 🌈"))
-
-# Streamlit UI
-def run_streamlit():
-    st.set_page_config(page_title="Friendly To-Do List", page_icon="✅", layout="centered")
-    
-    st.title("✨ Friendly Task Manager")
-    st.caption("Your warm and encouraging productivity companion")
-    
-    # Task creation form
-    with st.form("new_task", clear_on_submit=True):
-        title = st.text_input("What would you like to accomplish?", placeholder="Enter task...")
-        description = st.text_area("Details (optional)", placeholder="Add more details...")
-        priority = st.selectbox("Priority", ["medium", "high", "low"], index=0)
-        submitted = st.form_submit_button("Add Task 🌱")
+    def create_widgets(self):
+        # Task creation form
+        ttk.Label(self.root, text="What would you like to accomplish?").pack(pady=5)
         
-        if submitted and title:
-            with app.test_client() as client:
-                response = client.post('/tasks', json={
-                    'title': title,
-                    'description': description,
-                    'priority': priority
-                })
-            if response.status_code == 201:
-                st.success("Task added successfully!")
-                st.balloons()
-            else:
-                st.error("Failed to add task")
-    
-    # Load tasks from API
-    with app.test_client() as client:
-        response = client.get('/tasks')
-        if response.status_code == 200:
-            tasks = response.json['tasks']
-        else:
-            st.error("Failed to load tasks")
-            tasks = []
-    
-    # Display tasks
-    st.subheader("Your Tasks")
-    if not tasks:
-        st.info("No tasks yet! Add your first task above.", icon="ℹ️")
-    
-    for task in tasks:
-        task_id = task['id']
-        cols = st.columns([0.1, 0.7, 0.2])
+        self.title_entry = ttk.Entry(self.root, width=40)
+        self.title_entry.pack(pady=5)
         
-        with cols[0]:
-            # Checkbox for completion
-            if task['completed']:
-                st.checkbox("", key=f"done_{task_id}", value=True, disabled=True)
-            else:
-                if st.checkbox("", key=f"complete_{task_id}", value=False):
-                    with app.test_client() as client:
-                        response = client.put(f'/tasks/{task_id}/complete')
-                    if response.status_code == 200:
-                        st.experimental_rerun()
+        ttk.Label(self.root, text="Details (optional):").pack(pady=5)
+        self.desc_entry = ttk.Entry(self.root, width=40)
+        self.desc_entry.pack(pady=5)
         
-        with cols[1]:
-            # Task display
-            title_style = "line-through" if task['completed'] else "none"
-            st.markdown(
-                f"<span style='text-decoration:{title_style}; font-size:18px;'>"
-                f"{task['display']}</span>", 
-                unsafe_allow_html=True
-            )
+        ttk.Label(self.root, text="Priority:").pack(pady=5)
+        self.priority_var = tk.StringVar(value="medium")
+        priority_combo = ttk.Combobox(self.root, textvariable=self.priority_var, 
+                                     values=["high", "medium", "low"], state="readonly")
+        priority_combo.pack(pady=5)
+        
+        add_btn = ttk.Button(self.root, text="Add Task", command=self.add_task)
+        add_btn.pack(pady=10)
+        
+        # Task list
+        self.task_frame = ttk.Frame(self.root)
+        self.task_frame.pack(fill=tk.BOTH, expand=True, padx=10, pady=10)
+        
+        # Encouragement section
+        ttk.Separator(self.root, orient="horizontal").pack(fill=tk.X, padx=10, pady=10)
+        
+        self.encouragement_label = ttk.Label(self.root, text="", font=("Arial", 10, "italic"))
+        self.encouragement_label.pack(pady=5)
+        
+        ttk.Button(self.root, text="Give me encouragement!", 
+                  command=self.show_encouragement).pack(pady=5)
+        
+        self.progress_label = ttk.Label(self.root, text="", font=("Arial", 9))
+        self.progress_label.pack(pady=5)
+        
+    def load_tasks(self):
+        """Load tasks from JSON file"""
+        if not os.path.exists(DB_FILE):
+            return []
+        try:
+            with open(DB_FILE, 'r') as f:
+                return json.load(f)
+        except:
+            return []
             
-            if task.get('description'):
-                st.caption(task['description'])
-                
-            if task['completed']:
-                completed_time = datetime.fromisoformat(task.get('completed_at', datetime.now().isoformat())).strftime("%b %d, %H:%M")
-                st.caption(f"Completed at {completed_time}")
+    def save_tasks(self, tasks):
+        """Save tasks to JSON file"""
+        with open(DB_FILE, 'w') as f:
+            json.dump(tasks, f, indent=2)
+            
+    def random_encouragement(self):
+        encouragements = [
+            "You're doing amazing!",
+            "One task at a time - you've got this!",
+            "Every small step counts!",
+            "Be proud of what you've accomplished today!"
+        ]
+        return random.choice(encouragements)
         
-        with cols[2]:
-            # Delete button
-            if st.button("🗑️", key=f"delete_{task_id}"):
-                with app.test_client() as client:
-                    response = client.delete(f'/tasks/{task_id}')
-                if response.status_code == 200:
-                    st.experimental_rerun()
-    
-    # Stats and encouragement
-    completed_count = sum(1 for t in tasks if t['completed'])
-    total_count = len(tasks)
-    
-    st.divider()
-    st.subheader("💌 Encouragement Corner")
-    if st.button("I need motivation!"):
-        st.success(f"_{random_encouragement()}_")
-    
-    st.metric("Your Progress", f"{completed_count}/{total_count} completed", 
-              help="Celebrate your accomplishments!")
+    def add_task(self):
+        title = self.title_entry.get().strip()
+        if not title:
+            messagebox.showwarning("Input Error", "Task title is required!")
+            return
+            
+        tasks = self.load_tasks()
+        new_task = {
+            'id': str(uuid.uuid4()),
+            'title': title,
+            'description': self.desc_entry.get().strip(),
+            'created': datetime.now().isoformat(),
+            'completed': False,
+            'priority': self.priority_var.get()
+        }
+        tasks.append(new_task)
+        self.save_tasks(tasks)
+        
+        self.title_entry.delete(0, tk.END)
+        self.desc_entry.delete(0, tk.END)
+        self.refresh_tasks()
+        messagebox.showinfo("Success", "Task added successfully!")
+        
+    def complete_task(self, task_id):
+        tasks = self.load_tasks()
+        for task in tasks:
+            if task['id'] == task_id:
+                task['completed'] = True
+                task['completed_at'] = datetime.now().isoformat()
+                break
+        self.save_tasks(tasks)
+        self.refresh_tasks()
+        
+    def delete_task(self, task_id):
+        tasks = self.load_tasks()
+        tasks = [t for t in tasks if t['id'] != task_id]
+        self.save_tasks(tasks)
+        self.refresh_tasks()
+        
+    def show_encouragement(self):
+        self.encouragement_label.config(text=self.random_encouragement())
+        
+    def refresh_tasks(self):
+        # Clear existing tasks
+        for widget in self.task_frame.winfo_children():
+            widget.destroy()
+            
+        tasks = self.load_tasks()
+        completed_count = sum(1 for t in tasks if t['completed'])
+        
+        # Update progress
+        self.progress_label.config(text=f"Progress: {completed_count}/{len(tasks)} completed")
+        
+        if not tasks:
+            ttk.Label(self.task_frame, text="No tasks yet! Add your first task above.").pack()
+            return
+            
+        for task in tasks:
+            frame = ttk.Frame(self.task_frame)
+            frame.pack(fill=tk.X, pady=5)
+            
+            # Priority indicator
+            priority_colors = {'high': 'red', 'medium': 'orange', 'low': 'green'}
+            canvas = tk.Canvas(frame, width=20, height=20, highlightthickness=0)
+            canvas.create_oval(5, 5, 15, 15, fill=priority_colors.get(task['priority'], 'gray'))
+            canvas.pack(side=tk.LEFT, padx=(0, 5))
+            
+            # Task info
+            title_font = ("Arial", 10, "overstrike" if task['completed'] else "normal")
+            title_label = ttk.Label(frame, text=task['title'], font=title_font)
+            title_label.pack(side=tk.LEFT, anchor="w", fill=tk.X, expand=True)
+            
+            if task['description']:
+                desc_label = ttk.Label(frame, text=task['description'], font=("Arial", 8))
+                desc_label.pack(side=tk.LEFT, anchor="w", fill=tk.X, expand=True)
+            
+            # Action buttons
+            if not task['completed']:
+                ttk.Button(frame, text="✓", width=2, 
+                          command=lambda tid=task['id']: self.complete_task(tid)).pack(side=tk.RIGHT, padx=2)
+            
+            ttk.Button(frame, text="✕", width=2, 
+                      command=lambda tid=task['id']: self.delete_task(tid)).pack(side=tk.RIGHT, padx=2)
 
-# Execution control
-if __name__ == '__main__':
-    # Create database file if needed
-    if not os.path.exists(DB_FILE):
-        save_tasks([])
-    
-    # Start Flask in background thread
-    threading.Thread(target=app.run, kwargs={'port': 5000}, daemon=True).start()
-    
-    # Open browser to Streamlit
-    webbrowser.open("http://localhost:8501")
-    
-    # Run Streamlit
-    run_streamlit()
+if __name__ == "__main__":
+    root = tk.Tk()
+    app = TodoApp(root)
+    root.mainloop()
