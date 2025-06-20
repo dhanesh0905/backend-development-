@@ -168,3 +168,19 @@ def run_streamlit():
     st.title("✨ Friendly Task Manager")
     st.caption("Your warm and encouraging productivity companion")
     
+#form for task creation 
+    with st.form("new_task", clear_on_submit=True):
+        title = st.text_input("What would you like to accomplish?", placeholder="Enter task...")
+        priority = st.selectbox("Priority", ["medium", "high", "low"], index=0)
+        submitted = st.form_submit_button("Add Task 🌱")
+        
+        if submitted and title:
+            response = app.test_client().post('/tasks', json={
+                'title': title, 
+                'priority': priority
+            })
+            if response.status_code == 201:
+                st.success("Task added successfully!")
+            else:
+                st.error("Failed to add task")
+   
