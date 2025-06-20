@@ -1,3 +1,41 @@
+"""
+FUNCTIONAL REQUIREMENTS (5):
+
+1. Task Management
+   - Users can create tasks with title, description, and priority
+   - Tasks can be marked as completed
+   - Tasks can be permanently deleted
+
+2. Priority System
+   - Tasks can be assigned high/medium/low priority
+   - Priority visually represented with color-coded indicators
+   - Default priority set to medium
+
+3. Progress Tracking
+   - System calculates and displays completed/total tasks
+   - Provides visual feedback on completion status
+
+4. Encouragement System
+   - Provides random motivational messages
+   - On-demand encouragement via button click
+
+5. Data Persistence
+   - Tasks automatically saved to JSON file
+   - Tasks persist between application sessions
+
+NON-FUNCTIONAL REQUIREMENTS (2):
+
+1. Usability
+   - Intuitive interface requiring minimal training
+   - Clear visual feedback for user actions
+   - Responsive design with appropriate spacing
+
+2. Reliability
+   - Robust error handling for file operations
+   - Graceful handling of empty states
+   - Consistent performance across operations
+"""
+
 import tkinter as tk
 from tkinter import ttk, messagebox
 import json
