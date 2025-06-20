@@ -1,13 +1,13 @@
 import uuid
 import random
+import json
+import os
 from datetime import datetime
 from flask import Flask, jsonify, request
 from flasgger import Swagger
 import streamlit as st
 import threading
 import webbrowser
-import os
-import sys
 
 # Initialize Flask app
 app = Flask(__name__)
@@ -19,8 +19,8 @@ app.config['SWAGGER'] = {
 }
 Swagger(app)
 
-# In-memory database
-todos = []
+# JSON database file
+DB_FILE = "todo_db.json"
 
 # Helper functions
 def human_response(message, status='success', **kwargs):
@@ -44,12 +44,29 @@ def random_encouragement():
     ]
     return random.choice(encouragements)
 
+# Database functions
+def load_tasks():
+    """Load tasks from JSON file"""
+    if not os.path.exists(DB_FILE):
+        return []
+    try:
+        with open(DB_FILE, 'r') as f:
+            return json.load(f)
+    except:
+        return []
+
+def save_tasks(tasks):
+    """Save tasks to JSON file"""
+    with open(DB_FILE, 'w') as f:
+        json.dump(tasks, f, indent=2)
+
 # Flask API endpoints
 @app.route('/tasks', methods=['GET'])
 def get_tasks():
+    tasks = load_tasks()
     return jsonify({
-        'tasks': [human_task(t) for t in todos],
-        'count': len(todos),
+        'tasks': [human_task(t) for t in tasks],
+        'count': len(tasks),
         'encouragement': random_encouragement()
     })
 
@@ -59,6 +76,7 @@ def create_task():
     if not data or 'title' not in data or not data['title'].strip():
         return jsonify(human_response('Task title is required!', 'error')), 400
         
+    tasks = load_tasks()
     new_task = {
         'id': str(uuid.uuid4()),
         'title': data['title'].strip(),
@@ -67,28 +85,32 @@ def create_task():
         'completed': False,
         'priority': data.get('priority', 'medium')
     }
-    todos.append(new_task)
+    tasks.append(new_task)
+    save_tasks(tasks)
     return jsonify(human_response("Task created! 🌱", task=human_task(new_task))), 201
 
 @app.route('/tasks/<task_id>/complete', methods=['PUT'])
 def complete_task(task_id):
-    task = next((t for t in todos if t['id'] == task_id), None)
+    tasks = load_tasks()
+    task = next((t for t in tasks if t['id'] == task_id), None)
     if not task:
         return jsonify(human_response("Task not found", "error")), 404
         
     task['completed'] = True
     task['completed_at'] = datetime.now().isoformat()
+    save_tasks(tasks)
     return jsonify(human_response("Congrats!! You completed a task! 🎉", task=human_task(task)))
 
 @app.route('/tasks/<task_id>', methods=['DELETE'])
 def delete_task(task_id):
-    global todos
-    initial_count = len(todos)
-    todos = [t for t in todos if t['id'] != task_id]
+    tasks = load_tasks()
+    initial_count = len(tasks)
+    tasks = [t for t in tasks if t['id'] != task_id]
     
-    if len(todos) == initial_count:
+    if len(tasks) == initial_count:
         return jsonify(human_response("Task not found", "error")), 404
         
+    save_tasks(tasks)
     return jsonify(human_response("Task removed! Making space for new accomplishments 🌈"))
 
 # Streamlit UI
@@ -98,79 +120,102 @@ def run_streamlit():
     st.title("✨ Friendly Task Manager")
     st.caption("Your warm and encouraging productivity companion")
     
+    # Task creation form
     with st.form("new_task", clear_on_submit=True):
         title = st.text_input("What would you like to accomplish?", placeholder="Enter task...")
+        description = st.text_area("Details (optional)", placeholder="Add more details...")
         priority = st.selectbox("Priority", ["medium", "high", "low"], index=0)
         submitted = st.form_submit_button("Add Task 🌱")
         
         if submitted and title:
             with app.test_client() as client:
-                response = client.post('/tasks', json={'title': title, 'priority': priority})
+                response = client.post('/tasks', json={
+                    'title': title,
+                    'description': description,
+                    'priority': priority
+                })
             if response.status_code == 201:
                 st.success("Task added successfully!")
+                st.balloons()
             else:
                 st.error("Failed to add task")
     
+    # Load tasks from API
+    with app.test_client() as client:
+        response = client.get('/tasks')
+        if response.status_code == 200:
+            tasks = response.json['tasks']
+        else:
+            st.error("Failed to load tasks")
+            tasks = []
+    
+    # Display tasks
     st.subheader("Your Tasks")
-    if not todos:
+    if not tasks:
         st.info("No tasks yet! Add your first task above.", icon="ℹ️")
     
-    for task in todos:
+    for task in tasks:
         task_id = task['id']
-        cols = st.columns([0.1, 0.6, 0.2, 0.1])
+        cols = st.columns([0.1, 0.7, 0.2])
         
         with cols[0]:
-            if st.checkbox("", key=f"complete_{task_id}", value=task['completed']):
-                if not task['completed']:
+            # Checkbox for completion
+            if task['completed']:
+                st.checkbox("", key=f"done_{task_id}", value=True, disabled=True)
+            else:
+                if st.checkbox("", key=f"complete_{task_id}", value=False):
                     with app.test_client() as client:
                         response = client.put(f'/tasks/{task_id}/complete')
                     if response.status_code == 200:
                         st.experimental_rerun()
-              
-        with cols[1]:
-            priority_icon = {
-                'high': '❗️ High', 
-                'medium': '🔸 Medium', 
-                'low': '🔹 Low'
-            }.get(task['priority'], '📝')
-            
-            status = "~~" if task['completed'] else ""
-            st.markdown(f"{status}{priority_icon} **{task['title']}**{status}")
-            if task['description']:
-                st.caption(task['description'])
         
-        with cols[3]:
+        with cols[1]:
+            # Task display
+            title_style = "line-through" if task['completed'] else "none"
+            st.markdown(
+                f"<span style='text-decoration:{title_style}; font-size:18px;'>"
+                f"{task['display']}</span>", 
+                unsafe_allow_html=True
+            )
+            
+            if task.get('description'):
+                st.caption(task['description'])
+                
+            if task['completed']:
+                completed_time = datetime.fromisoformat(task.get('completed_at', datetime.now().isoformat())).strftime("%b %d, %H:%M")
+                st.caption(f"Completed at {completed_time}")
+        
+        with cols[2]:
+            # Delete button
             if st.button("🗑️", key=f"delete_{task_id}"):
                 with app.test_client() as client:
                     response = client.delete(f'/tasks/{task_id}')
                 if response.status_code == 200:
                     st.experimental_rerun()
     
+    # Stats and encouragement
+    completed_count = sum(1 for t in tasks if t['completed'])
+    total_count = len(tasks)
+    
     st.divider()
     st.subheader("💌 Encouragement Corner")
     if st.button("I need motivation!"):
-        st.success(random_encouragement())
-        
-    st.markdown("---")
-    st.markdown("### API Documentation")
-    st.markdown("Our backend API follows OpenAPI standards: [http://localhost:5000/apidocs](http://localhost:5000/apidocs)")
+        st.success(f"_{random_encouragement()}_")
+    
+    st.metric("Your Progress", f"{completed_count}/{total_count} completed", 
+              help="Celebrate your accomplishments!")
 
 # Execution control
 if __name__ == '__main__':
-    if os.environ.get("RUNNING_IN_STREAMLIT") != "true":
-        # First execution: Launch Flask and Streamlit
-        os.environ["RUNNING_IN_STREAMLIT"] = "true"
-        
-        # Start Flask in background thread
-        threading.Thread(target=app.run, daemon=True).start()
-        
-        # Launch browser
-        webbrowser.open("http://localhost:8501")
-        
-        # Run Streamlit normally
-        import streamlit.web.cli as stcli
-        sys.argv = ["streamlit", "run", __file__, "--server.port=8501"]
-        sys.exit(stcli.main())
-    else:
-        # Subsequent execution: Only run Streamlit UI
-        run_streamlit()
+    # Create database file if needed
+    if not os.path.exists(DB_FILE):
+        save_tasks([])
+    
+    # Start Flask in background thread
+    threading.Thread(target=app.run, kwargs={'port': 5000}, daemon=True).start()
+    
+    # Open browser to Streamlit
+    webbrowser.open("http://localhost:8501")
+    
+    # Run Streamlit
+    run_streamlit()
