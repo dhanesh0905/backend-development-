@@ -199,4 +199,29 @@ def run_streamlit():
                     response = app.test_client().put(f'/tasks/{task_id}/complete')
                     if response.status_code == 200:
                         st.experimental_rerun()
+              
+        with cols[1]:
+            # Task display with priority indicator
+            priority_icon = {
+                'high': '❗️ High', 
+                'medium': '🔸 Medium', 
+                'low': '🔹 Low'
+            }.get(task['priority'], '📝')
+            
+            status = "~~" if task['completed'] else ""
+            st.markdown(f"{status}{priority_icon} **{task['title']}**{status}")
+            if task['description']:
+                st.caption(task['description'])
         
+        with cols[3]:
+            # Delete button
+            if st.button("🗑️", key=f"delete_{task_id}"):
+                response = app.test_client().delete(f'/tasks/{task_id}')
+                if response.status_code == 200:
+                    st.experimental_rerun()
+    
+    # Encouragement section
+    st.divider()
+    st.subheader("💌 Encouragement Corner")
+    if st.button("I need motivation!"):
+        st.success(random_encouragement())
