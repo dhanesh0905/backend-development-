@@ -240,7 +240,7 @@ if __name__ == '__main__':
     webbrowser.open("http://localhost:8501")
     
     # Start Streamlit frontend
-    import streamlit.cli as stcli
+    import streamlit.web.cli as stcli
     import sys
     sys.argv = ["streamlit", "run", __file__, "--server.port=8501", "--server.headless=true"]
     sys.exit(stcli.main())
