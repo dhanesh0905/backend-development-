@@ -131,3 +131,32 @@ def complete_task(task_id):
     task['completed'] = True
     task['completed_at'] = datetime.now().isoformat()
     return jsonify(human_response("congrats !! u completed a task ! 🎉", task=human_task(task)))
+
+
+#delete the tasks 
+@app.route('/tasks/<task_id>', methods=['DELETE'])
+def delete_task(task_id):
+    """
+    Delete a task
+    ---
+    parameters:
+      - name: task_id
+        in: path
+        type: string
+        required: true
+    responses:
+      200:
+        description: Task deleted
+        examples:
+          message: Task removed! Making space for new accomplishments 🌈
+      404:
+        description: Task not found
+    """
+    global todos
+    initial_count = len(todos)
+    todos = [t for t in todos if t['id'] != task_id]
+    
+    if len(todos) == initial_count:
+        return jsonify(human_response("Task not found", "error")), 404
+        
+    return jsonify(human_response("Task removed! Making space for new accomplishments 🌈"))
